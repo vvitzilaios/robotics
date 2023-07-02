@@ -8,16 +8,18 @@ import cv2
 from geometry_msgs.msg import TransformStamped
 import tf2_ros
 
+
 class TTBallLocator(LifecycleNode):
     def __init__(self):
         super().__init__('tt_ball_locator')
         self.declare_parameter('rgb_topic')
         self.declare_parameter('depth_topic')
         self.declare_parameter('tf_frame_id')
+        self.tf_frame_id = None
         self.rgb_subscriber = None
         self.depth_subscriber = None
         self.tf_broadcaster = None
-        self.cv_bridge = CvBridge() # to convert ROS Image message to OpenCV image
+        self.cv_bridge = CvBridge()  # to convert ROS Image message to OpenCV image
         self.depth_image = None
 
     def on_configure(self, state):
@@ -71,13 +73,12 @@ class TTBallLocator(LifecycleNode):
             c = max(contours, key=cv2.contourArea)
             ((x, y), radius) = cv2.minEnclosingCircle(c)
 
-            
             center = (int(x), int(y))
 
             # Now that we have the center of the ball in the color image, we can find the depth
             depth = self.depth_image[center[1], center[0]]
 
-            #calculate the 3D position and broadcast the TF
+            # calculate the 3D position and broadcast the TF
             tf = TransformStamped()
             tf.header.stamp = self.get_clock().now().to_msg()
             tf.header.frame_id = "camera_frame"
@@ -95,6 +96,7 @@ class TTBallLocator(LifecycleNode):
         # Convert the ROS Image message to an OpenCV image
         self.depth_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
 
+
 def main(args=None):
     rclpy.init(args=args)
     tt_ball_locator = TTBallLocator()
@@ -105,6 +107,7 @@ def main(args=None):
     finally:
         executor.remove_node(tt_ball_locator)
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
