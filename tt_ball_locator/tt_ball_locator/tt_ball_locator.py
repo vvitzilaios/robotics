@@ -1,6 +1,7 @@
 import rclpy
-from rclpy.node import Node
-from rclpy.lifecycle import LifecycleNode
+from rclpy.lifecycle import Node
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import numpy as np
@@ -9,7 +10,7 @@ from geometry_msgs.msg import TransformStamped
 import tf2_ros
 
 
-class TTBallLocator(LifecycleNode):
+class TTBallLocator(Node):
     def __init__(self):
         super().__init__('tt_ball_locator')
         self.declare_parameter('rgb_topic')
@@ -22,28 +23,28 @@ class TTBallLocator(LifecycleNode):
         self.cv_bridge = CvBridge()  # to convert ROS Image message to OpenCV image
         self.depth_image = None
 
-    def on_configure(self, state):
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Start of on_configure")
+
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Start of on_activate")
+
         rgb_topic = self.get_parameter('rgb_topic').get_parameter_value().string_value
         depth_topic = self.get_parameter('depth_topic').get_parameter_value().string_value
         self.tf_frame_id = self.get_parameter('tf_frame_id').get_parameter_value().string_value
         self.rgb_subscriber = self.create_subscription(Image, rgb_topic, self.rgb_callback, 10)
         self.depth_subscriber = self.create_subscription(Image, depth_topic, self.depth_callback, 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
-        return LifecycleTransition.SUCCESS
-
-    def on_activate(self, state):
-        return LifecycleTransition.SUCCESS
-
-    def on_deactivate(self, state):
-        return LifecycleTransition.SUCCESS
-
-    def on_cleanup(self, state):
-        return LifecycleTransition.SUCCESS
-
-    def on_shutdown(self, state):
-        return LifecycleTransition.SUCCESS
+        return super().on_activate(state)
 
     def rgb_callback(self, msg):
+        # Check if depth_image is available
+        if self.depth_image is None:
+            self.get_logger().warn("No depth image received yet.")
+            return
+
         # Convert the ROS Image message to an OpenCV image
         cv_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
@@ -63,9 +64,6 @@ class TTBallLocator(LifecycleNode):
 
         # Find contours in the mask
         contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Initialize the ball center
-        center = None
 
         # Only proceed if at least one contour was found
         if len(contours) > 0:
